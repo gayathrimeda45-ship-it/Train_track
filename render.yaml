@@ -1,5 +1,5 @@
 services:
-  - type: Static_site
+  - type: static
     name: train-track
     branch: main
     buildCommand: ""
