@@ -1,8 +1,7 @@
 services:
-  - type: web
+  - type: static_site
     name: train-track
-    env: static
     branch: main
-    buildCommand: ""   # no build needed for plain HTML/CSS/JS
-    staticPublishPath: .  # publish everything from repo root
+    buildCommand: ""
+    staticPublishPath: .
     plan: free
