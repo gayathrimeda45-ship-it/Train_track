@@ -1,0 +1,1069 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AP Train Dashboard — SafeTrack Enhanced (Modified)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+:root{ --accent:#007bff; --bg:#f5f5f5; --card:#fff; --text:#222; --muted:#666; --danger:#dc3545; --success:#28a745; }
+*{box-sizing:border-box}
+body{ margin:0; font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); transition:background .25s,color .25s; }
+header{ display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:var(--accent); color:white; }
+header .left{ font-weight:600; display:flex; align-items:center; gap:12px; }
+header .right{ display:flex; align-items:center; gap:8px; }
+.clock{ font-size:0.9rem; opacity:.95 }
+.icon-btn{ border:0; background:rgba(255,255,255,0.12); color:white; padding:8px 10px; border-radius:6px; cursor:pointer; }
+.icon-btn:hover{ background:rgba(255,255,255,0.18); }
+.container{ max-width:1100px; margin:18px auto; padding:0 16px; }
+.top-row{ display:flex; gap:12px; align-items:flex-start; }
+
+.filters{ flex:1; display:flex; gap:8px; flex-wrap:wrap; }
+.filters input, .filters select { padding:8px 10px; border-radius:6px; border:1px solid #ccc; min-width:140px; }
+.filters button.search{ background:var(--accent); color:white; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; }
+.filters button.search:hover{ background:#0056b3; }
+
+.notif-bubble{ position:relative; display:inline-block; }
+.notif-badge{ position:absolute; right:-8px; top:-8px; background:var(--danger); color:white; font-size:0.75rem; padding:2px 6px; border-radius:999px; }
+
+.views{ margin-top:18px; display:grid; gap:16px; }
+.train-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; }
+.card{ background:var(--card); border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+.card h4{ margin:0 0 6px 0; color:var(--accent); font-size:1.05rem; }
+.muted{ color:var(--muted); font-size:0.95rem; margin:4px 0; }
+.progress-bar{ height:12px; background:#eee; border-radius:8px; overflow:hidden; margin:8px 0; }
+.progress{ height:100%; background:var(--success); width:0%; transition:width 900ms linear; }
+.status{ display:inline-block; padding:4px 8px; border-radius:6px; font-weight:600; font-size:0.9rem; }
+.status.ontime{ background:var(--success); color:white; }
+.status.minor{ background:#ffc107; color:#111; }
+.status.delayed{ background:var(--danger); color:white; }
+
+/* Admin */
+.admin-form{ display:grid; gap:8px; background:var(--card); padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+.admin-row{ display:flex; gap:8px; }
+.admin-row > *{ flex:1; }
+.admin-controls{ display:flex; gap:8px; }
+
+/* SafeTrack */
+.safe-panel{ display:grid; gap:10px; background:var(--card); padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+table{ width:100%; border-collapse:collapse; }
+table thead th{ text-align:left; font-size:0.85rem; padding:8px 6px; color:var(--muted); }
+table tbody td{ padding:8px 6px; border-top:1px solid #eee; font-size:0.95rem; }
+
+.notifs-panel{ position:fixed; right:18px; top:68px; width:420px; max-height:70vh; overflow:auto; background:var(--card); box-shadow:0 8px 30px rgba(0,0,0,0.12); border-radius:10px; display:none; padding:12px; z-index:500; }
+.notif-item{ border-left:4px solid #eee; padding:8px; margin-bottom:8px; border-radius:6px; }
+.notif-item.critical{ border-left-color:var(--danger); background:rgba(220,53,69,0.06); }
+.notif-time{ font-size:0.8rem; color:var(--muted); }
+
+/* Booking modal */
+.modal{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:var(--card); width:92%; max-width:960px; max-height:85vh; overflow:auto; padding:14px; border-radius:10px; box-shadow:0 18px 60px rgba(0,0,0,0.2); z-index:800; display:none; }
+.modal.open{ display:block; }
+.modal h3{ margin-top:0; }
+.seat-map{ display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:8px; }
+.seat{ padding:8px; border-radius:6px; text-align:center; cursor:pointer; border:1px solid #ddd; background:#fafafa; }
+.seat.booked{ background:#eee; cursor:not-allowed; text-decoration:line-through; color:#999; }
+.seat.selected{ background:#007bff; color:white; }
+.seat.female-only{ outline:2px dashed #ff69b4; }
+
+.booking-summary{ margin-top:10px; display:flex; gap:8px; align-items:center; justify-content:space-between; }
+.btn-primary{ background:var(--accent); color:white; padding:8px 10px; border-radius:6px; border:0; cursor:pointer; }
+.btn-danger{ background:var(--danger); color:white; padding:8px 10px; border-radius:6px; border:0; cursor:pointer; }
+
+.bookings-history{ background:var(--card); padding:10px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.06); max-height:250px; overflow:auto; }
+
+.footer-note{ font-size:0.85rem; color:var(--muted); margin-top:8px; }
+
+/* platform timeline (mini) */
+.timeline { display:flex; gap:6px; align-items:center; margin-top:8px; }
+.timeline .slot{ flex:1; height:12px; background:#f0f0f0; border-radius:6px; position:relative; overflow:hidden; }
+.timeline .slot .occ{ position:absolute; height:100%; background:rgba(0,123,255,0.12); border-left:2px solid rgba(0,123,255,0.25); }
+
+/* dark mode */
+body.dark{ --bg:#121214; --card:#1f1f24; --text:#e6e6e6; --muted:#bdbdbd; --accent:#0b5ed7; }
+
+@media (max-width:640px){ .seat-map{ grid-template-columns:repeat(4,1fr); } .filters input{ min-width:100px; } .notifs-panel{ width:320px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="left"><i class="fa fa-train"></i> <div>AP Train Dashboard — SafeTrack Enhanced</div></div>
+  <div class="right">
+    <div class="clock" id="clock">--:--:--</div>
+    <button class="icon-btn" id="btnDashboard"><i class="fa fa-eye"></i> Dashboard</button>
+    <button class="icon-btn" id="btnAdmin"><i class="fa fa-user-shield"></i> Admin</button>
+    <button class="icon-btn" id="btnSafeTrack"><i class="fa fa-shield-halved"></i> SafeTrack</button>
+    <button class="icon-btn" id="btnBookings"><i class="fa fa-ticket"></i> My Bookings</button>
+    <div class="notif-bubble">
+      <button class="icon-btn" id="btnNotifs"><i class="fa fa-bell"></i></button>
+    <button class="icon-btn" id="btnMap"><i class="fa fa-map"></i> Map</button>
+      <span id="notifBadge" class="notif-badge" style="display:none">0</span>
+    </div>
+    <button class="icon-btn" id="darkToggle"><i class="fa fa-moon"></i></button>
+  </div>
+</header>
+
+<div class="container">
+  <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;">
+    <div class="muted">Map: Andhra Pradesh (simplified). Click SafeTrack → Check Platform Conflicts to run detector.</div>
+    <div><button class="btn-primary" onclick="checkAllPlatformConflicts()">Check platform conflicts now</button></div>
+  </div>
+
+  <div class="views">
+
+    <!-- Dashboard View -->
+    <div id="dashboardView">
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div class="filters" style="flex:1">
+          <input list="stations" id="sourceFilter" placeholder="Source">
+          <input list="stations" id="destinationFilter" placeholder="Destination">
+          <input id="searchNumberOrName" placeholder="Search by train name or number">
+          <datalist id="stations"></datalist>
+          <button class="search" onclick="loadDashboardTrains()">SEARCH</button>
+        </div>
+        <div style="min-width:180px; text-align:right;"><div class="muted">Notifications: <b id="notifCount">0</b></div></div>
+      </div>
+      <div style="margin-top:12px;"><div id="trainCards" class="train-cards"></div></div>
+    </div>
+
+    <!-- Admin View -->
+    <div id="adminView" style="display:none;">
+      <div class="admin-form card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0">Admin: Add / Edit Train & Stops</h3>
+          <div style="font-size:0.9rem;color:var(--muted)">Tip: provide stops JSON in the textarea below (see sample). Platform assignment per stop required for SafeTrack.</div>
+        </div>
+        <div class="admin-row">
+          <input list="trainNames" id="adminSearchName" placeholder="Search train by name (type & select)"><datalist id="trainNames"></datalist>
+          <button class="small-btn" style="padding:8px" onclick="adminLoadByName()">Load</button>
+        </div>
+        <form id="adminForm" onsubmit="event.preventDefault(); addOrUpdateTrain();">
+          <div class="admin-row">
+            <input id="trainNumber" placeholder="Train Number" required>
+            <input id="trainName" placeholder="Train Name" required>
+          </div>
+          <div class="admin-row">
+            <input id="source" placeholder="Source (station)" required>
+            <input id="destination" placeholder="Destination (station)" required>
+          </div>
+          <div class="admin-row">
+            <input id="departure" type="time" required>
+            <input id="arrival" type="time" required>
+          </div>
+          <div class="admin-row">
+            <select id="type"><option>Express</option><option>Superfast</option><option>Mail</option></select>
+            <input id="currentSpeed" type="number" placeholder="Current speed (km/h)" min="10" value="80">
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="muted">Stops JSON (array of stops) — each stop: {"station","platform","km","arrival","departure"}</label>
+            <textarea id="stopsJson" rows="6" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="small-btn" onclick="parseStopsJson()">Parse stops</button>
+              <button type="button" class="small-btn" onclick="fillSampleStops()">Fill sample stops</button>
+            </div>
+          </div>
+
+          <div class="admin-controls">
+            <button type="submit" class="btn-primary">ADD / UPDATE</button>
+            <button type="button" class="small-btn" style="background:#6c757d;color:white;" onclick="clearAdminForm()">Clear</button>
+            <button type="button" class="small-btn btn-danger" onclick="deleteTrainPrompt()">Delete</button>
+            <button type="button" class="small-btn" style="background:#ffc107;color:#111;" onclick="changeTiming()">Change Timing (issue notice)</button>
+          </div>
+        </form>
+      </div>
+
+      <div style="margin-top:14px;" class="card">
+        <h4 style="margin-top:0">Existing trains</h4>
+        <div id="adminList" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;"></div>
+      </div>
+    </div>
+
+    <!-- SafeTrack View -->
+    <div id="safeTrackView" style="display:none;">
+      <div class="safe-panel card">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="flex:1; display:flex; gap:8px;">
+            <select id="trackSelect" style="min-width:250px"></select>
+            <input id="speedChange" type="number" placeholder="Speed change (%) e.g. 20 for -20%" />
+            <button class="small-btn" onclick="simulateTrackSpeed()">Simulate Speed Change</button>
+            <button class="small-btn" onclick="checkAllPlatformConflicts()">Check platform conflicts</button>
+          </div>
+          <div style="text-align:right"><div class="muted">Active instructions will appear below</div></div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <table>
+            <thead><tr><th>Train</th><th>Sched Arrival</th><th>Curr Arrival</th><th>Status</th><th>Instruction</th><th>Actions</th></tr></thead>
+            <tbody id="safeTrackTable"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:10px;">
+          <h4 style="margin:0 0 8px 0">SafeTrack logs</h4>
+          <div id="safeTrackLogs" style="max-height:200px;overflow:auto;padding:8px;border-radius:6px;background:#fafafa"></div>
+        </div>
+      </div>
+    </div>
+
+  
+<!-- Rail Map View -->
+<div id="mapView" style="display:none;">
+  <div class="card" style="padding:10px;">
+    <h3 style="margin-top:0">AP Rail Map (interactive)</h3>
+    <div style="margin-bottom:8px;" class="muted">Nodes = stations. Lines = tracks. Conflicting stations flash red.</div>
+    <div id="railMap" style="width:100%;height:420px;border:1px solid #eee;border-radius:8px;overflow:hidden"></div>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+      <button class="small-btn" onclick="drawRailMap(latestConflicts)">Refresh map</button>
+      <button class="small-btn" onclick="centerMap()">Center map</button>
+      <div class="muted" style="margin-left:auto">Tip: Run 'Check platform conflicts now' to highlight conflicts.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- notifications panel -->
+<div id="notifsPanel" class="notifs-panel"></div>
+
+<!-- Booking modal (unchanged) -->
+<div id="bookingModal" class="modal" aria-hidden="true">
+  <h3 id="modalTrainTitle">Book Tickets</h3>
+  <div id="modalTrack" class="muted"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+    <label style="min-width:84px">Travel date</label>
+    <input id="bookingDate" type="date">
+    <label style="min-width:80px">Coach</label>
+    <select id="bookingCoach"></select>
+    <label style="min-width:70px">Passengers</label>
+    <input id="passengerCount" type="number" min="1" max="6" value="1" style="width:80px">
+  </div>
+
+  <div style="margin-top:12px;">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div style="flex:1">
+        <div class="muted">Select seats (female-only seats marked)</div>
+        <div id="seatMap" class="seat-map"></div>
+      </div>
+      <div style="width:260px;">
+        <div style="font-weight:600">Passengers</div>
+        <div id="passengerForms" style="margin-top:8px"></div>
+        <div class="booking-summary">
+          <div class="muted">Selected seats: <span id="selectedSeatsText">None</span></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="btn-primary" onclick="confirmBooking()">Confirm Booking</button>
+          <button class="small-btn" onclick="closeBookingModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-note">Note: This is a simulated booking UI. Seat types and women's-only seats are simulated for demonstration.</div>
+</div>
+
+<!-- Booking details modal -->
+<div id="bookingDetailsModal" class="modal" aria-hidden="true">
+  <h3>Booking Details</h3>
+  <div id="bookingDetailsContent"></div>
+  <div style="margin-top:10px;"><button class="small-btn" onclick="closeBookingDetails()">Close</button></div>
+</div>
+
+<!-- Bookings history modal -->
+<div id="bookingsModal" class="modal" aria-hidden="true">
+  <h3>My Bookings</h3>
+  <div id="bookingsList" class="bookings-history"></div>
+  <div style="margin-top:8px;"><button class="small-btn" onclick="closeBookingsModal()">Close</button></div>
+</div>
+
+<script>
+/* -----------------
+   AP rail map (simplified sample)
+   Stations: id, name, platforms
+   Edges: from, to, distanceKm (approx)
+   Note: distances are approximate; edit them to match reality in admin/station data.
+   ----------------- */
+const apRailMap = {
+  stations: [
+    { id: "Visakhapatnam", name: "Visakhapatnam", platforms: 6 },
+    { id: "Dwarapudi", name: "Dwarapudi", platforms: 2 },
+    { id: "Anaparti", name: "Anaparti", platforms: 2 },
+    { id: "Rajahmundry", name: "Rajahmundry", platforms: 4 },
+    { id: "Samalkot", name: "Samalkot", platforms: 3 },
+    { id: "Eluru", name: "Eluru", platforms: 4 },
+    { id: "Vijayawada", name: "Vijayawada", platforms: 8 },
+    { id: "Guntur", name: "Guntur", platforms: 5 },
+    { id: "Nellore", name: "Nellore", platforms: 3 },
+    { id: "Tirupati", name: "Tirupati", platforms: 4 },
+    { id: "Kadapa", name: "Kadapa", platforms: 3 },
+    { id: "Kurnool", name: "Kurnool", platforms: 4 }
+  ],
+  edges: [
+    { from:"Visakhapatnam", to:"Dwarapudi", distanceKm:12 },
+    { from:"Dwarapudi", to:"Anaparti", distanceKm:3 },
+    { from:"Anaparti", to:"Rajahmundry", distanceKm:25 },
+    { from:"Rajahmundry", to:"Samalkot", distanceKm:10 },
+    { from:"Samalkot", to:"Eluru", distanceKm:100 },
+    { from:"Eluru", to:"Vijayawada", distanceKm:60 },
+    { from:"Vijayawada", to:"Guntur", distanceKm:30 },
+    { from:"Vijayawada", to:"Nellore", distanceKm:220 },
+    { from:"Vijayawada", to:"Tirupati", distanceKm:260 },
+    { from:"Guntur", to:"Kadapa", distanceKm:180 },
+    { from:"Kadapa", to:"Kurnool", distanceKm:130 }
+  ]
+};
+
+/* -----------------
+   Data & utilities (modified)
+   ----------------- */
+const DEFAULT_TRAINS = [
+  // Example with stops array (km is cumulative from first stop)
+  { number:"12718", name:"Ratnachal Express", type:"Superfast", source:"Visakhapatnam", destination:"Vijayawada", departure:"06:00", arrival:"12:30",
+    currentSpeed:80,
+    stops: [
+      { station:"Visakhapatnam", platform:"2", km:0, arrival:"06:00", departure:"06:05" },
+      { station:"Dwarapudi",    platform:"1", km:12, arrival:"06:18", departure:"06:20" },
+      { station:"Anaparti",     platform:"1", km:15, arrival:"06:30", departure:"06:32" },
+      { station:"Rajahmundry",  platform:"2", km:40, arrival:"07:10", departure:"07:15" },
+      { station:"Eluru",        platform:"1", km:200, arrival:"10:45", departure:"10:50" },
+      { station:"Vijayawada",   platform:"3", km:260, arrival:"12:25", departure:"12:30" }
+    ]
+  },
+  { number:"17487", name:"Tirumala Express", type:"Express", source:"Visakhapatnam", destination:"Tirupati", departure:"17:25", arrival:"06:15",
+    currentSpeed:75,
+    stops: [
+      { station:"Visakhapatnam", platform:"3", km:0, arrival:"17:25", departure:"17:30" },
+      { station:"Anakapalle",    platform:"2", km:22, arrival:"17:55", departure:"17:57" },
+      { station:"Rajahmundry",   platform:"1", km:40, arrival:"18:40", departure:"18:45" },
+      { station:"Eluru",         platform:"2", km:200, arrival:"22:00", departure:"22:05" },
+      { station:"Vijayawada",    platform:"4", km:260, arrival:"00:30", departure:"00:40" },
+      { station:"Tirupati",      platform:"1", km:520, arrival:"06:10", departure:"06:15" }
+    ]
+  },
+  // additional trains (kept short)
+  { number:"12727", name:"Godavari Express", type:"Superfast", source:"Visakhapatnam", destination:"Hyderabad", departure:"17:15", arrival:"05:45", currentSpeed:82 },
+  { number:"12839", name:"Howrah–Chennai Mail", type:"Mail", source:"Visakhapatnam", destination:"Tirupati", departure:"08:10", arrival:"19:45", currentSpeed:70 }
+];
+
+function loadStoredTrains(){ let t = JSON.parse(localStorage.getItem('trains')||'null'); if(!t){ t = DEFAULT_TRAINS.map(x=>({...x})); t.forEach(initializeTrainFields); localStorage.setItem('trains', JSON.stringify(t)); } else { t.forEach(initializeTrainFields); } return t; }
+function saveTrains(trains){ localStorage.setItem('trains', JSON.stringify(trains)); refreshAll(); }
+function loadBookings(){ return JSON.parse(localStorage.getItem('bookings')||'[]'); }
+function saveBookings(b){ localStorage.setItem('bookings', JSON.stringify(b)); refreshAll(); }
+
+function initializeTrainFields(tr){
+  if(!tr.scheduledDeparture) tr.scheduledDeparture = tr.departure;
+  if(!tr.scheduledArrival) tr.scheduledArrival = tr.arrival;
+  if(tr.currentSpeed == null) tr.currentSpeed = 80;
+  if(!tr.track) tr.track = `${tr.source} → ${tr.destination}`;
+  if(!Array.isArray(tr.messages)) tr.messages = [];
+  if(!tr.instruction) tr.instruction = null;
+  if(!tr.coaches) createCoachesForTrain(tr);
+  if(!Array.isArray(tr.stops) || tr.stops.length===0){
+    // create fallback simple stops using source/destination only (km unknown)
+    tr.stops = [{ station: tr.source, platform: null, km:0, arrival: tr.scheduledDeparture, departure: tr.scheduledDeparture },
+                { station: tr.destination, platform: null, km:100, arrival: tr.scheduledArrival, departure: tr.scheduledArrival }];
+  } else {
+    // ensure cumulative km exists for stops: if not, leave as-is (admin can edit)
+    let cum = 0;
+    for(let i=0;i<tr.stops.length;i++){
+      if(tr.stops[i].km==null) { tr.stops[i].km = cum; }
+      cum = tr.stops[i].km;
+    }
+  }
+}
+
+/* create stub coaches & seats for a train (2 coaches with 24 seats each for demo) */
+function createCoachesForTrain(tr){
+  tr.coaches = [];
+  const numCoaches = 2; const seatsPerCoach = 24;
+  for(let c=0;c<numCoaches;c++){
+    const coach = { name: 'C'+(c+1), seats: [] };
+    for(let i=1;i<=seatsPerCoach;i++){
+      const seatNo = c*seatsPerCoach + i;
+      const mod = i % 6;
+      const type = (mod===1? 'Lower' : mod===2? 'Middle' : mod===3? 'Upper' : mod===4? 'Side Lower' : mod===5? 'Side Upper' : 'Upper');
+      const femaleOnly = (i%7===0);
+      coach.seats.push({ seatNo, type, femaleOnly });
+    }
+    tr.coaches.push(coach);
+  }
+}
+
+/* utilities for time parsing */
+function timeToDateFromString(timeStr){
+  if(!timeStr) return null;
+  if(typeof timeStr === 'object' && timeStr instanceof Date) return timeStr;
+  if(timeStr.match && timeStr.match(/^\d{4}-\d{2}-\d{2}T/)) return new Date(timeStr);
+  if(timeStr.includes('T') && !timeStr.includes(':')) return new Date(timeStr);
+  // handles "HH:MM" returning today's date with that time (or next day if earlier than now by many hours)
+  if(timeStr.match(/^\d{1,2}:\d{2}$/)){
+    const [h,m] = (''+timeStr).split(':').map(Number);
+    const now = new Date();
+    let d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h||0, m||0, 0);
+    if(d.getTime() + 12*3600*1000 < now.getTime()) d.setDate(d.getDate()+1);
+    return d;
+  }
+  // try Date parse fallback
+  const d = new Date(timeStr);
+  if(!isNaN(d)) return d;
+  return null;
+}
+function formatTimeToHHMM(date){ if(!date) return ''; const d = new Date(date); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function nowIso(){ return new Date().toISOString(); }
+
+function addTrainMessage(trainNumber, text, severity='info'){
+  const trains = loadStoredTrains();
+  const t = trains.find(x=>x.number===trainNumber);
+  if(!t) return;
+  t.messages.unshift({ id:'m'+Date.now()+Math.random().toString(36).slice(2), text, time:nowIso(), read:false, severity });
+  saveTrains(trains);
+}
+
+function unreadCount(){ const trains = loadStoredTrains(); let c=0; trains.forEach(t=> (t.messages||[]).forEach(m=>{ if(!m.read) c++; })); return c; }
+function updateNotifBadge(){ const c = unreadCount(); const b = document.getElementById('notifBadge'); if(c>0){ b.style.display='inline-block'; b.innerText=c;} else b.style.display='none'; document.getElementById('notifCount').innerText = c; }
+
+/* -----------------
+   Dashboard render (uses stops[])
+   ----------------- */
+function loadDashboardTrains(){
+  const src = document.getElementById('sourceFilter').value.trim().toLowerCase();
+  const dst = document.getElementById('destinationFilter').value.trim().toLowerCase();
+  const q = document.getElementById('searchNumberOrName').value.trim().toLowerCase();
+  const trains = loadStoredTrains();
+  let list = trains.slice();
+  if(src && dst){
+    list = list.filter(t => (t.source && t.source.toLowerCase().includes(src)) && (t.destination && t.destination.toLowerCase().includes(dst)));
+  } else if(src){
+    list = list.filter(t => (t.source && t.source.toLowerCase().includes(src)) || (t.stops && t.stops.some(s=>s.station.toLowerCase().includes(src))) );
+  } else if(dst){
+    list = list.filter(t => (t.destination && t.destination.toLowerCase().includes(dst)) || (t.stops && t.stops.some(s=>s.station.toLowerCase().includes(dst))) );
+  }
+  if(q){
+    list = list.filter(t => t.number.toLowerCase().includes(q) || t.name.toLowerCase().includes(q));
+  }
+  renderTrainCards(list);
+}
+
+function renderTrainCards(list){
+  const container = document.getElementById('trainCards');
+  container.innerHTML='';
+  const now = new Date();
+  list.forEach(t=>{
+    const card = document.createElement('div'); card.className='card';
+    const dep = timeToDateFromString(t.departure || t.scheduledDeparture);
+    const arr = timeToDateFromString(t.arrivalIso || t.arrival || t.scheduledArrival);
+    let progress = 0; if(dep && arr){ if(now>arr) progress=100; else if(now>dep) progress = Math.max(1, Math.round(((now-dep)/(arr-dep))*100)); else progress=0; }
+    const schedDep = timeToDateFromString(t.scheduledDeparture); const schedArr = timeToDateFromString(t.scheduledArrival);
+    const durationMins = schedDep && schedArr ? Math.round((schedArr-schedDep)/60000) : null;
+    const hrs = durationMins ? Math.floor(durationMins/60):0; const mins = durationMins? durationMins%60:0;
+    let statusClass='ontime', statusText='On Time';
+    const hasCritical = (t.messages||[]).some(m=>!m.read && m.severity==='critical');
+    if(hasCritical){ statusClass='delayed'; statusText='Delayed (urgent)'; }
+    else {
+      if(arr && schedArr && (arr - schedArr) > 5*60000){ statusClass='delayed'; statusText='Delayed'; }
+      else if(arr && schedArr && (arr - schedArr) > 60*1000){ statusClass='minor'; statusText='Minor Delay'; }
+    }
+    const upcomingStops = (t.stops||[]).slice(0,4).map(s=>`${s.station}${s.platform? ' (P'+s.platform+')':''}`).join(' • ');
+    const lastMsg = (t.messages||[])[0]; const lastPreview = lastMsg ? `${lastMsg.text} (${new Date(lastMsg.time).toLocaleTimeString()})` : 'No messages';
+    card.innerHTML = `
+      <h4>${t.name} <span style="font-weight:600;color:#444">(${t.number})</span></h4>
+      <div class="muted">${t.source} → ${t.destination} • ${t.type} • ${t.track}</div>
+      <div style="margin-top:8px;">
+        <div class="muted">Departure: <b>${formatTimeToHHMM(dep)}</b> &nbsp; Arrival: <b>${formatTimeToHHMM(arr)}</b></div>
+        <div class="muted">Duration: ${hrs}h ${mins}m • Speed: ${t.currentSpeed || 0} km/h</div>
+      </div>
+      <div style="margin-top:8px;"><span class="status ${statusClass}">${statusText}</span><div style="float:right" class="muted">Progress: ${progress}%</div></div>
+      <div class="progress-bar" aria-hidden="true"><div class="progress" style="width:${progress}%"></div></div>
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="flex:1;font-size:0.95rem;color:var(--muted)"><b>Upcoming:</b> ${upcomingStops}<br>${lastPreview}</div>
+        <div style="margin-left:8px;display:flex;gap:6px">
+          <button class="small-btn" onclick="openTrainMessages('${t.number}')"><i class="fa fa-envelope"></i></button>
+          <button class="small-btn btn-primary" onclick="openTrainDetails('${t.number}')">Details & Book</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+  updateNotifBadge();
+}
+
+/* --------------
+   Train details & booking flow (unchanged)
+   -------------- */
+let currentBookingTrain = null;
+let selectedSeats = [];
+function openTrainDetails(number){
+  const trains = loadStoredTrains();
+  const t = trains.find(x=>x.number===number); if(!t) return alert('Train not found');
+  currentBookingTrain = t.number;
+  document.getElementById('modalTrainTitle').innerText = `${t.name} (${t.number}) — Book Tickets`;
+  document.getElementById('modalTrack').innerText = `${t.source} → ${t.destination} • ${t.type}`;
+  const isoDate = new Date().toISOString().slice(0,10);
+  document.getElementById('bookingDate').value = isoDate;
+  const sel = document.getElementById('bookingCoach'); sel.innerHTML='';
+  t.coaches.forEach((c,idx)=>{ const opt = document.createElement('option'); opt.value = idx; opt.textContent = c.name; sel.appendChild(opt); });
+  selectedSeats = [];
+  renderPassengerForms();
+  renderSeatMap();
+  openBookingModal();
+}
+
+function openBookingModal(){ document.getElementById('bookingModal').classList.add('open'); }
+function closeBookingModal(){ document.getElementById('bookingModal').classList.remove('open'); currentBookingTrain=null; selectedSeats=[]; renderPassengerForms(); }
+
+/* passenger forms & seat-map functions remain unchanged */
+function renderPassengerForms(){
+  const cnt = parseInt(document.getElementById('passengerCount').value || 1,10);
+  const container = document.getElementById('passengerForms'); container.innerHTML='';
+  for(let i=0;i<cnt;i++){
+    const div = document.createElement('div'); div.style.display='flex'; div.style.gap='6px'; div.style.marginBottom='6px';
+    const name = document.createElement('input'); name.placeholder=`Passenger ${i+1} name`; name.id = 'pname'+i; name.required=true;
+    const gender = document.createElement('select'); gender.id='pgender'+i; const o1=document.createElement('option'); o1.value='male'; o1.text='Male'; const o2=document.createElement('option'); o2.value='female'; o2.text='Female'; const o3=document.createElement('option'); o3.value='other'; o3.text='Other'; gender.appendChild(o1); gender.appendChild(o2); gender.appendChild(o3);
+    div.appendChild(name); div.appendChild(gender);
+    container.appendChild(div);
+  }
+}
+
+function renderSeatMap(){
+  if(!currentBookingTrain) return;
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===currentBookingTrain);
+  if(!t) return;
+  const coachIndex = parseInt(document.getElementById('bookingCoach').value || 0,10);
+  const coach = t.coaches[coachIndex];
+  const date = document.getElementById('bookingDate').value;
+  const bookings = loadBookings().filter(b => b.trainNumber===t.number && b.date===date);
+  const bookedSeats = new Set(); bookings.forEach(b => b.seats.forEach(s=>bookedSeats.add(s)));
+  const map = document.getElementById('seatMap'); map.innerHTML='';
+  coach.seats.forEach(s=>{
+    const el = document.createElement('div'); el.className='seat'; el.dataset.seat = s.seatNo;
+    if(bookedSeats.has(s.seatNo)) el.classList.add('booked');
+    if(s.femaleOnly) el.classList.add('female-only');
+    if(selectedSeats.includes(s.seatNo)) el.classList.add('selected');
+    el.innerHTML = `<div style="font-weight:600">${s.seatNo}</div><div style="font-size:0.8rem;color:var(--muted)">${s.type}${s.femaleOnly?'<br><small>Women only</small>':''}</div>`;
+    if(!el.classList.contains('booked')){
+      el.onclick = ()=> toggleSeatSelect(s, el);
+    }
+    map.appendChild(el);
+  });
+  document.getElementById('selectedSeatsText').innerText = selectedSeats.length? selectedSeats.join(', '): 'None';
+}
+
+function toggleSeatSelect(seat, el){
+  const cnt = parseInt(document.getElementById('passengerCount').value || 1,10);
+  if(selectedSeats.includes(seat.seatNo)){ selectedSeats = selectedSeats.filter(s=>s!==seat.seatNo); el.classList.remove('selected'); }
+  else {
+    if(selectedSeats.length >= cnt) return alert('You cannot select more seats than passenger count');
+    selectedSeats.push(seat.seatNo); el.classList.add('selected');
+  }
+  document.getElementById('selectedSeatsText').innerText = selectedSeats.length? selectedSeats.join(', '): 'None';
+}
+
+function confirmBooking(){
+  if(!currentBookingTrain) return alert('No train selected');
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===currentBookingTrain);
+  const date = document.getElementById('bookingDate').value;
+  if(!date) return alert('Select travel date');
+  const cnt = parseInt(document.getElementById('passengerCount').value || 1,10);
+  if(selectedSeats.length !== cnt) return alert('Please select seats equal to passenger count');
+  const passengers = [];
+  for(let i=0;i<cnt;i++){
+    const name = document.getElementById('pname'+i).value.trim();
+    const gender = document.getElementById('pgender'+i).value;
+    if(!name) return alert('Enter all passenger names');
+    passengers.push({ name, gender });
+  }
+  const coachIndex = parseInt(document.getElementById('bookingCoach').value || 0,10);
+  const coach = t.coaches[coachIndex];
+  for(let i=0;i<selectedSeats.length;i++){
+    const seatNo = selectedSeats[i];
+    const seat = coach.seats.find(s=>s.seatNo===seatNo);
+    if(seat && seat.femaleOnly){
+      const passenger = passengers[i];
+      if(!passenger || passenger.gender !== 'female'){
+        return alert(`Seat ${seatNo} is reserved for female passengers. Ensure passenger ${i+1} is female or pick a different seat.`);
+      }
+    }
+  }
+  const bookings = loadBookings();
+  const existing = bookings.filter(b => b.trainNumber===t.number && b.date===date).flatMap(b=>b.seats);
+  for(const s of selectedSeats){ if(existing.includes(s)) return alert('One of the selected seats was just booked. Please re-select.'); }
+  const bookingRef = 'BK' + Date.now().toString().slice(-6) + Math.random().toString(36).slice(2,6).toUpperCase();
+  const booking = { id: bookingRef, trainNumber: t.number, trainName: t.name, date, seats: selectedSeats.slice(), passengers, coach: coach.name, createdAt: nowIso() };
+  bookings.push(booking);
+  saveBookings(bookings);
+  addTrainMessage(t.number, `Booking ${bookingRef} created for ${selectedSeats.length} seat(s) on ${date}.`, 'info');
+  alert(`Booking confirmed: ${bookingRef}`);
+  closeBookingModal();
+  openBookingDetailsModal(bookingRef);
+}
+
+/* bookings UI */
+function openBookingDetailsModal(ref){
+  const bookings = loadBookings(); const b = bookings.find(x=>x.id===ref);
+  if(!b) return alert('Booking not found');
+  document.getElementById('bookingDetailsContent').innerHTML = `<div><b>Ref:</b> ${b.id}</div>
+    <div><b>Train:</b> ${b.trainName} (${b.trainNumber})</div>
+    <div><b>Date:</b> ${b.date}</div>
+    <div><b>Coach:</b> ${b.coach}</div>
+    <div><b>Seats:</b> ${b.seats.join(', ')}</div>
+    <div style="margin-top:8px"><b>Passengers:</b>${b.passengers.map(p=>`<div>${p.name} (${p.gender})</div>`).join('')}</div>
+    <div style="margin-top:8px"><button class="small-btn" onclick="cancelBooking('${b.id}')">Cancel Booking</button></div>`;
+  document.getElementById('bookingDetailsModal').classList.add('open');
+}
+
+function closeBookingDetails(){ document.getElementById('bookingDetailsModal').classList.remove('open'); }
+
+function openBookingsModal(){
+  document.getElementById('bookingsModal').classList.add('open'); renderBookingsList();
+}
+function closeBookingsModal(){ document.getElementById('bookingsModal').classList.remove('open'); }
+
+function renderBookingsList(){
+  const container = document.getElementById('bookingsList'); container.innerHTML='';
+  const bookings = loadBookings().slice().reverse();
+  if(bookings.length===0) container.innerHTML = '<div class="muted">No bookings yet</div>';
+  bookings.forEach(b=>{
+    const div = document.createElement('div'); div.style.padding='8px'; div.style.borderBottom='1px solid #f0f0f0';
+    div.innerHTML = `<div style="font-weight:600">${b.trainName} • ${b.date} • ${b.seats.join(', ')} <div style="float:right;color:var(--muted)">${b.id}</div></div>
+      <div class="muted">${b.passengers.map(p=>p.name+' ('+p.gender+')').join(', ')}</div>
+      <div style="margin-top:6px"><button class="small-btn" onclick="openBookingDetailsModal('${b.id}')">Details</button>
+      <button class="small-btn btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button></div>`;
+    container.appendChild(div);
+  });
+}
+
+/* cancel booking */
+function cancelBooking(ref){
+  if(!confirm('Cancel booking '+ref+'?')) return;
+  const bookings = loadBookings();
+  const index = bookings.findIndex(b=>b.id===ref);
+  if(index===-1) return alert('Booking not found');
+  const b = bookings[index];
+  bookings.splice(index,1);
+  saveBookings(bookings);
+  addTrainMessage(b.trainNumber, `Booking ${ref} was cancelled. Seats freed for ${b.date}.`, 'info');
+  alert('Booking cancelled');
+  renderBookingsList(); closeBookingDetails(); loadDashboardTrains();
+}
+
+/* -----------------
+   Notifications & messages
+   ----------------- */
+function renderNotifsPanel(){
+  const panel = document.getElementById('notifsPanel'); panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>Notifications</strong><div><button class="small-btn" onclick="markAllRead()">Mark all read</button><button class="small-btn" onclick="closeNotifs()">Close</button></div></div>`;
+  const trains = loadStoredTrains();
+  const allMsgs = [];
+  trains.forEach(t=> (t.messages||[]).forEach(m=> allMsgs.push({...m, trainName:t.name, trainNumber:t.number})));
+  allMsgs.sort((a,b)=> new Date(b.time) - new Date(a.time));
+  if(allMsgs.length===0) panel.innerHTML += '<div class="muted">No notifications</div>';
+  allMsgs.forEach(m=>{
+    const cls = m.severity==='critical'? 'critical' : (m.severity==='warn'? 'warn' : 'info');
+    const div = document.createElement('div'); div.className = `notif-item ${cls}`;
+    div.innerHTML = `<div style="font-weight:600">${m.text}</div><div class="notif-time">${m.trainName? (m.trainName+' • '+m.trainNumber) : ''} • ${new Date(m.time).toLocaleString()}</div>`;
+    panel.appendChild(div);
+  });
+}
+
+function openNotifs(){ renderNotifsPanel(); document.getElementById('notifsPanel').style.display='block'; }
+function closeNotifs(){ document.getElementById('notifsPanel').style.display='none'; }
+function markAllRead(){ const trains = loadStoredTrains(); trains.forEach(t=> (t.messages||[]).forEach(m=> m.read=true)); saveTrains(trains); renderNotifsPanel(); updateNotifBadge(); }
+
+function openTrainMessages(trainNumber){
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===trainNumber); if(!t) return;
+  const panel = document.getElementById('notifsPanel'); panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>Messages for ${t.name} (${t.number})</strong><div><button class="small-btn" onclick="closeNotifs()">Close</button></div></div>`;
+  if(!t.messages || t.messages.length===0) panel.innerHTML += '<div class="muted">No messages</div>';
+  else t.messages.forEach(m=>{ const cls = m.severity==='critical'? 'critical' : (m.severity==='warn'? 'warn' : 'info'); const div=document.createElement('div'); div.className=`notif-item ${cls}`; div.innerHTML = `<div style="font-weight:600">${m.text}</div><div class="notif-time">${new Date(m.time).toLocaleString()}</div>`; panel.appendChild(div); });
+  (t.messages||[]).forEach(m=>m.read=true); saveTrains(loadStoredTrains()); document.getElementById('notifsPanel').style.display='block'; updateNotifBadge();
+}
+
+/* ---------------------------------
+   Admin: list, edit, add, change timing
+   --------------------------------- */
+function populateAdminList(){
+  const div = document.getElementById('adminList'); const trains = loadStoredTrains(); div.innerHTML='';
+  trains.forEach(t=>{
+    const e = document.createElement('div'); e.style.display='flex'; e.style.justifyContent='space-between'; e.style.alignItems='center'; e.style.padding='6px'; e.style.borderBottom='1px solid #f0f0f0';
+    e.innerHTML = `<div style="font-weight:600">${t.name} <span style="font-weight:400;color:var(--muted)">(${t.number})</span><div class="muted" style="font-size:0.9rem">${t.source} → ${t.destination} • ${t.type}</div></div><div style="display:flex;gap:6px"><button class="small-btn" onclick="fillAdminForm('${t.number}')">Edit</button><button class="small-btn btn-danger" onclick="deleteTrainPrompt('${t.number}')">Delete</button></div>`;
+    div.appendChild(e);
+  });
+  populateTrainNamesDatalist();
+}
+
+function populateTrainNamesDatalist(){ const dl = document.getElementById('trainNames'); dl.innerHTML=''; loadStoredTrains().forEach(t=>{ const opt=document.createElement('option'); opt.value=t.name; dl.appendChild(opt); }); }
+
+function adminLoadByName(){ const name = document.getElementById('adminSearchName').value.trim(); if(!name) return alert('Type or select a train name'); const trains = loadStoredTrains(); const t = trains.find(x=>x.name.toLowerCase()===name.toLowerCase()); if(!t) return alert('Train not found'); fillAdminForm(t.number); }
+
+function fillAdminForm(number){ const trains = loadStoredTrains(); const t = trains.find(x=>x.number===number); if(!t) return; document.getElementById('trainNumber').value=t.number; document.getElementById('trainName').value=t.name; document.getElementById('source').value=t.source; document.getElementById('destination').value=t.destination; document.getElementById('departure').value = formatTimeToHHMM(timeToDateFromString(t.departure || t.scheduledDeparture)); document.getElementById('arrival').value = formatTimeToHHMM(timeToDateFromString(t.arrivalIso || t.arrival || t.scheduledArrival)); document.getElementById('type').value = t.type || 'Express'; document.getElementById('currentSpeed').value = t.currentSpeed || 80; document.getElementById('stopsJson').value = JSON.stringify(t.stops || [], null, 2); window.scrollTo({top:0,behavior:'smooth'}); }
+
+function parseStopsJson(){
+  const txt = document.getElementById('stopsJson').value;
+  if(!txt) return alert('Paste stops JSON into the textarea first.');
+  try{
+    const arr = JSON.parse(txt);
+    if(!Array.isArray(arr)) return alert('Stops JSON should be an array');
+    // basic validation for required fields
+    for(const s of arr){
+      if(!s.station) return alert('Each stop must include "station" name');
+      if(s.km==null) s.km = 0;
+    }
+    alert('Stops JSON parsed. When you save the train, stops will be stored.');
+  }catch(e){ alert('Invalid JSON: '+e.message); }
+}
+
+function fillSampleStops(){
+  const sample = [
+    { "station":"Visakhapatnam", "platform":"2", "km":0, "arrival":"06:00", "departure":"06:05" },
+    { "station":"Anaparti", "platform":"1", "km":15, "arrival":"06:30", "departure":"06:32" },
+    { "station":"Rajahmundry", "platform":"2", "km":40, "arrival":"07:10", "departure":"07:15" },
+    { "station":"Eluru", "platform":"1", "km":200, "arrival":"10:45", "departure":"10:50" },
+    { "station":"Vijayawada", "platform":"3", "km":260, "arrival":"12:25", "departure":"12:30" }
+  ];
+  document.getElementById('stopsJson').value = JSON.stringify(sample, null, 2);
+}
+
+function addOrUpdateTrain(){
+  const num = document.getElementById('trainNumber').value.trim(); const name = document.getElementById('trainName').value.trim();
+  const src = document.getElementById('source').value.trim(); const dst = document.getElementById('destination').value.trim();
+  const dep = document.getElementById('departure').value; const arr = document.getElementById('arrival').value; const type = document.getElementById('type').value; const speed = parseInt(document.getElementById('currentSpeed').value || 80,10);
+  if(!num||!name||!src||!dst||!dep||!arr) return alert('All fields required');
+  let stops = [];
+  try{ stops = JSON.parse(document.getElementById('stopsJson').value || '[]'); } catch(e){ return alert('Invalid stops JSON'); }
+  const trains = loadStoredTrains(); const exists = trains.find(t=>t.number===num);
+  if(exists){
+    exists.name=name; exists.source=src; exists.destination=dst; exists.departure=dep; exists.arrival=arr; exists.type=type; exists.currentSpeed=speed; exists.track = `${src} → ${dst}`; if(stops.length) exists.stops = stops;
+    saveTrains(trains); alert('Train updated'); populateAdminList(); loadDashboardTrains(); populateTracksDropdown();
+  } else {
+    const newTrain = { number:num, name, source:src, destination:dst, departure:dep, arrival:arr, type, currentSpeed:speed, messages:[], instruction:null, stops: stops.length?stops:[] };
+    initializeTrainFields(newTrain); newTrain.scheduledDeparture=dep; newTrain.scheduledArrival=arr; newTrain.track = `${src} → ${dst}`;
+    trains.push(newTrain); saveTrains(trains); alert('Train added'); populateAdminList(); loadDashboardTrains(); populateTracksDropdown();
+  }
+}
+
+function deleteTrainPrompt(number){
+  if(!number){ number = document.getElementById('trainNumber').value.trim(); if(!number) return alert('Enter train number to delete or use Delete button in list'); }
+  if(!confirm('Delete train '+number+'?')) return;
+  const trains = loadStoredTrains().filter(t=>t.number!==number); saveTrains(trains); populateAdminList(); loadDashboardTrains(); populateTracksDropdown();
+}
+
+function clearAdminForm(){ document.getElementById('adminForm').reset(); document.getElementById('stopsJson').value=''; }
+
+/* changeTiming now recomputes stops and runs conflict detector */
+function changeTiming(){
+  const num = document.getElementById('trainNumber').value.trim(); if(!num) return alert('Enter train number to change timing');
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===num); if(!t) return alert('Train not found');
+  const newDep = document.getElementById('departure').value; const newArr = document.getElementById('arrival').value; if(!newDep||!newArr) return alert('Fill departure and arrival');
+  const newDepDate = timeToDateFromString(newDep); const newArrDate = timeToDateFromString(newArr);
+  t.departure = newDep; t.arrival = newArr; t.arrivalIso = newArrDate.toISOString();
+  addTrainMessage(t.number, `Timing updated by admin. New arrival ${formatTimeToHHMM(newArrDate)}.`, 'info');
+  saveTrains(trains); populateAdminList(); loadDashboardTrains(); populateTracksDropdown();
+  // run platform conflict check to see if new times cause collision
+  const conflicts = checkAllPlatformConflicts();
+  if(conflicts.length) showConflictsSummary(conflicts);
+  alert('Timing changed and notice issued.');
+}
+
+/* -----------------
+   Platform occupancy + conflict detection
+   ----------------- */
+/**
+ * Build platform occupancy records from trains.
+ * Each record: { station, platform, trainNumber, trainName, start:Date, end:Date }
+ */
+function buildPlatformOccupancies(trains, stationFilter = null, bufferMinutes = 3){
+  const occ = [];
+  const bufMs = bufferMinutes * 60 * 1000;
+  trains.forEach(t=>{
+    const stops = t.stops && Array.isArray(t.stops) && t.stops.length ? t.stops
+                  : [{ station: t.source, platform: t.platform || null, arrival: t.scheduledDeparture, departure: t.scheduledDeparture },
+                     { station: t.destination, platform: t.platform || null, arrival: t.scheduledArrival, departure: t.scheduledArrival }];
+    stops.forEach(stop=>{
+      if(stationFilter && stop.station !== stationFilter) return;
+      const arr = timeToDateFromString(stop.arrival || stop.scheduledArrival || t.arrivalIso || t.arrival || t.scheduledArrival);
+      const dep = timeToDateFromString(stop.departure || stop.scheduledDeparture || t.departure || t.scheduledDeparture);
+      if(!arr && !dep) return;
+      const depTime = dep || new Date((arr?arr.getTime():Date.now()) + (2 * 60 * 1000));
+      const start = new Date(arr.getTime() - bufMs);
+      const end   = new Date(depTime.getTime() + bufMs);
+      occ.push({
+        station: stop.station,
+        platform: stop.platform || t.platform || 'UNASSIGNED',
+        trainNumber: t.number,
+        trainName: t.name,
+        start, end
+      });
+    });
+  });
+  return occ;
+}
+
+function detectPlatformConflicts(occupancies){
+  const conflicts = [];
+  const groups = {};
+  occupancies.forEach(o => {
+    const key = `${o.station}||${o.platform}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(o);
+  });
+  Object.keys(groups).forEach(key=>{
+    const [station, platform] = key.split('||');
+    const arr = groups[key].slice().sort((x,y)=> x.start - y.start);
+    let prev = null;
+    for(let i=0;i<arr.length;i++){
+      const curr = arr[i];
+      if(prev && curr.start < prev.end){
+        const overlapStart = new Date(Math.max(curr.start.getTime(), prev.start.getTime()));
+        const overlapEnd   = new Date(Math.min(curr.end.getTime(), prev.end.getTime()));
+        const overlapMinutes = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 60000);
+        conflicts.push({
+          station, platform,
+          a: prev, b: curr,
+          overlapStart, overlapEnd, overlapMinutes
+        });
+      }
+      if(!prev || prev.end.getTime() < curr.end.getTime()) prev = curr;
+    }
+  });
+  return conflicts;
+}
+
+/**
+ * Run full check across all stations, create notifications, and return conflicts.
+ */
+function checkAllPlatformConflicts(bufferMinutes = 3){
+  const trains = loadStoredTrains();
+  const occ = buildPlatformOccupancies(trains, null, bufferMinutes);
+  const conflicts = detectPlatformConflicts(occ);
+  // create notifications for conflicts
+  conflicts.forEach(c=>{
+    const msg = `Potential platform conflict at ${c.station} platform ${c.platform}: ${c.a.trainName} (${c.a.trainNumber}) and ${c.b.trainName} (${c.b.trainNumber}) overlap ${c.overlapMinutes} min between ${formatTimeToHHMM(c.overlapStart)} and ${formatTimeToHHMM(c.overlapEnd)}.`;
+    addTrainMessage(c.a.trainNumber, msg, 'critical');
+    addTrainMessage(c.b.trainNumber, msg, 'critical');
+  });
+  saveTrains(loadStoredTrains());
+  updateNotifBadge();
+  return conflicts;
+}
+
+/* Utility: show a quick summary in notifsPanel */
+function showConflictsSummary(conflicts){
+  const panel = document.getElementById('notifsPanel');
+  panel.innerHTML = `<div style="display:flex;justify-content:space-between"><strong>Platform Conflicts</strong><div><button class="small-btn" onclick="closeNotifs()">Close</button></div></div>`;
+  if(conflicts.length===0){ panel.innerHTML += '<div class="muted" style="margin-top:8px">No conflicts found.</div>'; }
+  conflicts.forEach(c=>{
+    const line = document.createElement('div');
+    line.className = 'notif-item critical';
+    line.innerHTML = `<div style="font-weight:600">${c.station} • Platform ${c.platform}</div>
+      <div style="font-size:0.95rem">${c.a.trainName} (${c.a.trainNumber}) vs ${c.b.trainName} (${c.b.trainNumber})</div>
+      <div class="notif-time">${formatTimeToHHMM(c.overlapStart)} - ${formatTimeToHHMM(c.overlapEnd)} • ${c.overlapMinutes} min overlap</div>
+      <div style="margin-top:6px">
+        <button class="small-btn" onclick="safeTrackIncreaseSpeed('${c.a.trainNumber}')">Ask ${c.a.trainNumber} to increase</button>
+        <button class="small-btn" onclick="safeTrackIncreaseSpeed('${c.b.trainNumber}')">Ask ${c.b.trainNumber} to increase</button>
+        <button class="small-btn btn-danger" onclick="addTrainMessage('${c.b.trainNumber}','Hold ${c.b.trainNumber} at previous station to avoid platform clash','critical')">Hold ${c.b.trainNumber}</button>
+      </div>`;
+    panel.appendChild(line);
+  });
+  panel.style.display='block';
+}
+
+/* -----------------
+   SafeTrack logic (modified to use stops distances when possible)
+   ----------------- */
+function populateTracksDropdown(){ const sel=document.getElementById('trackSelect'); sel.innerHTML=''; const trains=loadStoredTrains(); const tracks=[...new Set(trains.map(t=>t.track))]; tracks.forEach(tr=>{ const opt=document.createElement('option'); opt.value=tr; opt.textContent=tr; sel.appendChild(opt); }); }
+
+function simulateTrackSpeed(){
+  const track = document.getElementById('trackSelect').value; let percent = parseFloat(document.getElementById('speedChange').value || '0');
+  if(!track) return alert('Select a track'); if(isNaN(percent) || percent<=0) return alert('Enter a positive percent');
+  const trains = loadStoredTrains(); const now=new Date(); const affected = trains.filter(t=>t.track===track);
+  if(affected.length===0) return alert('No trains on this track');
+  affected.forEach(t=>{
+    const arrDate = timeToDateFromString(t.arrivalIso || t.arrival || t.scheduledArrival); if(!arrDate) return;
+    if(arrDate.getTime() <= now.getTime()) return;
+    // improved propagation using stops if available
+    if(t.stops && t.stops.length>1){
+      // find first stop whose arrival is after now
+      let idx = t.stops.findIndex(s=>{ const a = timeToDateFromString(s.arrival||s.departure); return a && a.getTime() > now.getTime(); });
+      if(idx<0) idx = 0;
+      const remainingStops = t.stops.slice(idx);
+      // compute remaining distance
+      const totalRemainingKm = (remainingStops[remainingStops.length-1].km || 0) - (remainingStops[0].km || 0);
+      // approximate: apply percent slowdown to remaining journey -> new remaining time = remaining_time/(1 - d)
+      const remainingMs = (arrDate.getTime() - now.getTime());
+      const d = percent/100;
+      const newRemainingMs = Math.round(remainingMs / (1 - d));
+      const newArrival = new Date(now.getTime() + newRemainingMs);
+      // push new arrival to last stop and scale intermediate stops proportionally
+      const origStart = timeToDateFromString(remainingStops[0].arrival||remainingStops[0].departure) || now;
+      const origEnd = arrDate;
+      const origMs = origEnd.getTime() - origStart.getTime();
+      const ratio = newRemainingMs / (origMs || newRemainingMs);
+      // update downstream stops arrival/departure times proportionally
+      for(let k=0;k<remainingStops.length;k++){
+        const s = remainingStops[k];
+        const sOrig = timeToDateFromString(s.arrival||s.departure) || new Date(now.getTime() + 60*60*1000*(k+1));
+        const diff = sOrig.getTime() - origStart.getTime();
+        const newTime = new Date(now.getTime() + Math.round(diff * ratio));
+        s.arrival = formatTimeToHHMM(newTime);
+        s.departure = formatTimeToHHMM(new Date(newTime.getTime() + 2*60*1000));
+      }
+      t.arrivalIso = new Date(now.getTime() + newRemainingMs).toISOString();
+      t.arrival = formatTimeToHHMM(t.arrivalIso);
+      t.instruction = { type:'speed-reduction', percent:percent, requiredIncreasePercent: Math.round((d/(1-d))*100), issuedAt: now.toISOString(), deadline: new Date(now.getTime()+5*60*1000).toISOString(), track, originalArrivalIso: arrDate.toISOString() };
+      addTrainMessage(t.number, `SafeTrack: speed reduced by ${percent}% on ${track}. Expected arrival changed from ${formatTimeToHHMM(arrDate)} to ${formatTimeToHHMM(t.arrival)}. Crew: please increase speed by ~${t.instruction.requiredIncreasePercent}% to recover.`, 'warn');
+    } else {
+      // fallback to old behaviour
+      const remainingMs = (arrDate.getTime() - now.getTime()); const d = percent/100; const newRemainingMs = Math.round(remainingMs / (1 - d)); const newArrival = new Date(now.getTime() + newRemainingMs);
+      t.instruction = { type:'speed-reduction', percent:percent, requiredIncreasePercent: Math.round((d/(1-d))*100), issuedAt: now.toISOString(), deadline: new Date(now.getTime()+5*60*1000).toISOString(), track, originalArrivalIso: arrDate.toISOString() };
+      t.arrivalIso = newArrival.toISOString(); t.arrival = formatTimeToHHMM(newArrival);
+      addTrainMessage(t.number, `SafeTrack: speed reduced by ${percent}% on ${track}. Expected arrival changed from ${formatTimeToHHMM(arrDate)} to ${formatTimeToHHMM(newArrival)}. Crew: please increase speed by ~${t.instruction.requiredIncreasePercent}% to recover.`, 'warn');
+    }
+  });
+  saveTrains(trains); appendSafeTrackLog(`Simulated ${percent}% speed reduction on ${track} for ${affected.length} train(s). Deadline to act: 5 minutes.`); populateSafeTrackTable(); loadDashboardTrains();
+  const conflicts = checkAllPlatformConflicts();
+  if(conflicts.length) showConflictsSummary(conflicts);
+}
+
+function safeTrackIncreaseSpeed(trainNumber){
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===trainNumber); if(!t || !t.instruction) return alert('No active instruction');
+  const origIso = t.instruction.originalArrivalIso; if(origIso){ t.arrivalIso = origIso; t.arrival = formatTimeToHHMM(timeToDateFromString(t.arrivalIso)); }
+  t.currentSpeed = Math.round((t.currentSpeed || 80) * (1 + (t.instruction.requiredIncreasePercent/100)));
+  addTrainMessage(t.number, `Crew increased speed and recovered schedule. Arrival back to ${formatTimeToHHMM(timeToDateFromString(t.arrivalIso))}`, 'info');
+  t.instruction = null; saveTrains(trains); appendSafeTrackLog(`Train ${t.number} (${t.name}) increased speed and recovered schedule.`); populateSafeTrackTable(); loadDashboardTrains();
+}
+
+function safeTrackAcknowledge(trainNumber){
+  const trains = loadStoredTrains(); const t = trains.find(x=>x.number===trainNumber); if(!t || !t.instruction) return alert('No active instruction'); t.instruction.acknowledged = true; addTrainMessage(t.number, `Crew acknowledged SafeTrack instruction for ${t.instruction.track}. Will act soon.`, 'info'); saveTrains(trains); appendSafeTrackLog(`Train ${t.number} acknowledged instruction.`); populateSafeTrackTable();
+}
+
+function checkInstructionsExpiry(){ const trains = loadStoredTrains(); const now=new Date(); let changed=false; trains.forEach(t=>{ if(t.instruction && t.instruction.deadline){ const dl = new Date(t.instruction.deadline); if(now.getTime()>dl.getTime() && !t.instruction.expired){ addTrainMessage(t.number, `SafeTrack Escalation: Train ${t.number} did not increase speed by deadline. Notify control.`, 'critical'); appendSafeTrackLog(`Escalation: Train ${t.number} did not act by deadline.`); t.instruction.expired = true; changed=true; } } }); if(changed) saveTrains(trains); populateSafeTrackTable(); loadDashboardTrains(); }
+
+function populateSafeTrackTable(){ const tbody = document.getElementById('safeTrackTable'); tbody.innerHTML=''; const track = document.getElementById('trackSelect').value; if(!track) return; const trains = loadStoredTrains().filter(t=>t.track===track); const now=new Date(); trains.forEach(t=>{ const row = document.createElement('tr'); const schedArr = formatTimeToHHMM(timeToDateFromString(t.scheduledArrival)); const currArr = formatTimeToHHMM(timeToDateFromString(t.arrivalIso || t.arrival || t.scheduledArrival)); let status='On Route'; let instr='-'; if(t.instruction){ instr = `${t.instruction.type} (${t.instruction.percent}%) due ${new Date(t.instruction.deadline).toLocaleTimeString()}` + (t.instruction.expired? ' • EXPIRED':'' ); } const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; const btnAck = document.createElement('button'); btnAck.innerText='Acknowledge'; btnAck.className='small-btn btn-ack'; btnAck.onclick = ()=> safeTrackAcknowledge(t.number); const btnInc = document.createElement('button'); btnInc.innerText='Increase Speed'; btnInc.className='small-btn btn-inc'; btnInc.onclick = ()=> safeTrackIncreaseSpeed(t.number); actions.appendChild(btnAck); actions.appendChild(btnInc); row.innerHTML = `<td><b>${t.name}</b><div class="muted">${t.number}</div></td><td>${schedArr}</td><td>${currArr}</td><td>${status}</td><td>${instr}</td><td></td>`; row.querySelector('td:last-child').appendChild(actions); tbody.appendChild(row); }); const logs = JSON.parse(localStorage.getItem('safeTrackLogs')||'[]'); const logsDiv = document.getElementById('safeTrackLogs'); logsDiv.innerHTML = logs.slice().reverse().map(l=>`<div style="font-size:0.9rem;margin-bottom:6px">${l.time} • ${l.text}</div>`).join(''); }
+
+function appendSafeTrackLog(text){ const arr = JSON.parse(localStorage.getItem('safeTrackLogs')||'[]'); arr.push({ time:new Date().toLocaleString(), text }); localStorage.setItem('safeTrackLogs', JSON.stringify(arr.slice(-200))); }
+
+/* -----------------
+   Boot & wiring
+   ----------------- */
+function refreshAll(){ populateAdminList(); populateTracksDropdown(); loadDashboardTrains(); updateNotifBadge(); populateSafeTrackTable(); renderBookingsList(); populateStationsDatalist(); }
+document.getElementById('btnAdmin').addEventListener('click', ()=> showView('admin')); document.getElementById('btnDashboard').addEventListener('click', ()=> showView('dashboard')); document.getElementById('btnSafeTrack').addEventListener('click', ()=> showView('safetrack')); document.getElementById('btnNotifs').addEventListener('click', openNotifs); document.getElementById('darkToggle').addEventListener('click', ()=> document.body.classList.toggle('dark')); document.getElementById('btnBookings').addEventListener('click', ()=> openBookingsModal());
+
+function populateStationsDatalist(){
+  const dl = document.getElementById('stations'); dl.innerHTML='';
+  apRailMap.stations.forEach(s=>{ const opt=document.createElement('option'); opt.value = s.id; dl.appendChild(opt); });
+}
+
+function showView(v){ document.getElementById('dashboardView').style.display = v==='dashboard' ? 'block' : 'none'; document.getElementById('adminView').style.display = v==='admin' ? 'block' : 'none'; document.getElementById('safeTrackView').style.display = v==='safetrack' ? 'block' : 'none'; populateAdminList(); populateTracksDropdown(); populateSafeTrackTable(); }
+
+/* initial */
+(function init(){ loadStoredTrains(); refreshAll(); showView('dashboard'); setInterval(()=> document.getElementById('clock').innerText = new Date().toLocaleTimeString(), 1000); setInterval(checkInstructionsExpiry, 10*1000); setInterval(loadDashboardTrains, 30*1000); })();
+
+/* helper: render seat map when booking selections change */
+document.getElementById('bookingCoach').addEventListener('change', renderSeatMap);
+document.getElementById('bookingDate').addEventListener('change', renderSeatMap);
+document.getElementById('passengerCount').addEventListener('change', ()=>{ renderPassengerForms(); selectedSeats=[]; renderSeatMap(); });
+
+/* bookings list rendering for bookings modal */
+function renderBookingsList(){ const container=document.getElementById('bookingsList'); container.innerHTML=''; const bookings=loadBookings().slice().reverse(); if(bookings.length===0) container.innerHTML='<div class="muted">No bookings yet</div>'; bookings.forEach(b=>{ const div=document.createElement('div'); div.style.padding='8px'; div.style.borderBottom='1px solid #f0f0f0'; div.innerHTML = `<div style="font-weight:600">${b.trainName} • ${b.date} • ${b.seats.join(', ')} <div style="float:right;color:var(--muted)">${b.id}</div></div><div class="muted">${b.passengers.map(p=>p.name+' ('+p.gender+')').join(', ')}</div><div style="margin-top:6px"><button class="small-btn" onclick="openBookingDetailsModal('${b.id}')">Details</button> <button class="small-btn btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button></div>`; container.appendChild(div); }); }
+
+/* small utilities to open/close booking modal programmatically for tests */
+function openBookingForTest(trainNumber){ openTrainDetails(trainNumber); }
+
+</script>
+
+<!-- D3 map scripts -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// Minimal AP nodes and edges for visualization (you can extend this list)
+const mapData = {
+  nodes: [
+    { id: "Visakhapatnam" }, { id: "Dwarapudi" }, { id: "Anaparti" }, { id: "Anakapalle" },
+    { id: "Rajahmundry" }, { id: "Samalkot" }, { id: "Eluru" }, { id: "Vijayawada" },
+    { id: "Guntur" }, { id: "Tirupati" }, { id: "Kadapa" }, { id: "Kurnool" }
+  ],
+  links: [
+    { source: "Visakhapatnam", target: "Dwarapudi" },
+    { source: "Dwarapudi", target: "Anaparti" },
+    { source: "Anaparti", target: "Rajahmundry" },
+    { source: "Rajahmundry", target: "Samalkot" },
+    { source: "Samalkot", target: "Eluru" },
+    { source: "Eluru", target: "Vijayawada" },
+    { source: "Vijayawada", target: "Guntur" },
+    { source: "Vijayawada", target: "Tirupati" },
+    { source: "Guntur", target: "Kadapa" },
+    { source: "Kadapa", target: "Kurnool" }
+  ]
+};
+
+let latestConflicts = []; // stored conflicts from last check
+
+function drawRailMap(conflicts = []){
+  latestConflicts = conflicts || [];
+  const conflictStations = new Set((conflicts||[]).map(c=>c.station));
+  const container = document.getElementById('railMap');
+  container.innerHTML = ''; // clear
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  const svg = d3.select(container).append('svg').attr('width', width).attr('height', height);
+
+  const simulation = d3.forceSimulation(mapData.nodes)
+    .force('link', d3.forceLink(mapData.links).id(d=>d.id).distance(120))
+    .force('charge', d3.forceManyBody().strength(-500))
+    .force('center', d3.forceCenter(width/2, height/2));
+
+  const link = svg.append('g').attr('class','links')
+    .selectAll('line').data(mapData.links).enter().append('line')
+    .attr('stroke','#999').attr('stroke-width',2);
+
+  const node = svg.append('g').attr('class','nodes')
+    .selectAll('g').data(mapData.nodes).enter().append('g').attr('class', d=> conflictStations.has(d.id)? 'conflict' : '');
+
+  node.append('circle')
+    .attr('r', 12)
+    .attr('fill', d => conflictStations.has(d.id) ? '#ff4444' : '#69b3a2')
+    .attr('stroke', '#333')
+    .attr('stroke-width', 1.2)
+    .call(d3.drag()
+      .on('start', (event,d)=>{ if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event,d)=>{ d.fx = event.x; d.fy = event.y; })
+      .on('end', (event,d)=>{ if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  node.append('text').text(d=>d.id).attr('font-size', 11).attr('y', -16).attr('text-anchor','middle');
+
+  simulation.on('tick', ()=>{
+    link.attr('x1', d=>d.source.x).attr('y1', d=>d.source.y).attr('x2', d=>d.target.x).attr('y2', d=>d.target.y);
+    node.attr('transform', d=>`translate(${d.x},${d.y})`);
+  });
+
+  // pulse animation for conflicts
+  if(conflictStations.size){
+    svg.selectAll('circle').filter(d=>conflictStations.has(d.id)).transition().duration(600).attr('r', 18).transition().duration(600).attr('r', 12).on('end', function(){ d3.select(this).transition().duration(600).attr('r',18).transition().duration(600).attr('r',12); });
+  }
+}
+
+function centerMap(){ // restart simulation centered
+  drawRailMap(latestConflicts);
+}
+
+// Hook map update to existing conflict checker by overriding showConflictsSummary
+const _origShowConflictsSummary = window.showConflictsSummary || function(){ /* no-op */ };
+window.showConflictsSummary = function(conflicts){
+  try{ drawRailMap(conflicts); }catch(e){ console.warn(e); }
+  _origShowConflictsSummary(conflicts);
+};
+
+// When page loads, draw the map empty
+document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=> drawRailMap([]), 400); });
+
+// wire map button to show the map view
+const btnMap = document.getElementById('btnMap');
+if(btnMap) btnMap.addEventListener('click', ()=>{
+  // hide others and show map view
+  document.getElementById('dashboardView').style.display='none';
+  document.getElementById('adminView').style.display='none';
+  document.getElementById('safeTrackView').style.display='none';
+  document.getElementById('mapView').style.display='block';
+});
+
+</script>
+
+</body>
+</html>
